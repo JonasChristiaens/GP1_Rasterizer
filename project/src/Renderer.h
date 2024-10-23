@@ -30,6 +30,12 @@ namespace dae
 		void Update(Timer* pTimer);
 		void Render();
 
+		void Renderer_W1_Part1();
+		void Renderer_W1_Part2();
+		void Renderer_W1_Part3();
+		void Renderer_W1_Part4();
+		void Renderer_W1_Part5();
+
 		bool SaveBufferToImage() const;
 
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const;
