@@ -25,6 +25,9 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 	//Initialize Camera
 	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
+
+	//Globalize aspectratio
+	m_AspectRatio = m_Width / static_cast<float>(m_Height);
 }
 
 Renderer::~Renderer()
@@ -43,9 +46,9 @@ void Renderer::Render()
 	//Lock BackBuffer
 	SDL_LockSurface(m_pBackBuffer);
 
-	Renderer_W1_Part1(); //Rasterizer Stage Only
+	//Renderer_W1_Part1(); //Rasterizer Stage Only
 	//Renderer_W1_Part2(); //Projection Stage (Camera)
-	//Renderer_W1_Part3(); //Barycentric coordinates
+	Renderer_W1_Part3(); //Barycentric coordinates
 	//Renderer_W1_Part4(); //Depth Buffer
 	//Renderer_W1_Part5(); //BoundingBox Optimization
 
@@ -73,38 +76,30 @@ void Renderer::Renderer_W1_Part1()
 	*/
 
 	//Loop through all vertices 
-	for (int vertexIdx{}; vertexIdx < vertices_ndc.size(); ++vertexIdx)
+	for (int vertexIdx{}; vertexIdx < vertices_ndc.size(); vertexIdx += 3)
 	{
-		//Convert coordinates from  NDC to screen space
-		float screenSpaceVertexX{ ((vertices_ndc[vertexIdx].x + 1) / 2) * m_Width };
-		float screenSpaceVertexY{ ((1 - vertices_ndc[vertexIdx].y) / 2) * m_Height };
-		
-		//calculate "next in line" coordinates which we will use for cross product
-		float nextScreenSpaceVertexX{ ((vertices_ndc[(vertexIdx + 1) % 3].x + 1) / 2) * m_Width };
-		float nextScreenSpaceVertexY{ ((1 - vertices_ndc[(vertexIdx + 1) % 3].y) / 2) * m_Height };
-
-		//create Vector2 of these vertices of the triangle
-		Vector3 currentVertex{ screenSpaceVertexX, screenSpaceVertexY, 1.0f };
-		Vector3 clockWiseNextVertex{ nextScreenSpaceVertexX, nextScreenSpaceVertexY, 1.0f };
+		Vector2 v0{ ((vertices_ndc[vertexIdx].x + 1) / 2) * m_Width, ((1 - vertices_ndc[vertexIdx].y) / 2) * m_Height };
+		Vector2 v1{ ((vertices_ndc[vertexIdx + 1].x + 1) / 2) * m_Width, ((1 - vertices_ndc[vertexIdx + 1].y) / 2) * m_Height };
+		Vector2 v2{ ((vertices_ndc[vertexIdx + 2].x + 1) / 2) * m_Width, ((1 - vertices_ndc[vertexIdx + 2].y) / 2) * m_Height };
 
 		for (int px{}; px < m_Width; ++px)
 		{
 			for (int py{}; py < m_Height; ++py)
 			{
-				ColorRGB finalColor{ };
+				Vector2 P{ (float)px + .5f, (float)py + .5f };
 
-				//"intersection" Pixel & calculating vector from current vertex to pixel
-				Vector3 pixel{ px + 0.5f, py + 0.5f, 1.0f};
-				Vector2 vectorFromVertexToPixel{ pixel - currentVertex };
-				Vector2 vectorFromVertexToVertex{ clockWiseNextVertex - currentVertex };
+				ColorRGB finalColor{};
 
-				//calculating cross product to check signs of returned areas 
-				float signedArea{ Vector3::Cross(vectorFromVertexToVertex, vectorFromVertexToPixel) };
-				if (signedArea < 0)
+				if (Vector2::Cross(v1 - v0, P - v0) > 0 and Vector2::Cross(v2 - v1, P - v1) > 0 and Vector2::Cross(v0 - v2, P - v2) > 0)
 				{
 					finalColor = colors::White;
 				}
-				
+
+				/*float gradient = px / static_cast<float>(m_Width);
+				//gradient += py / static_cast<float>(m_Width);
+				gradient /= 2.0f;
+
+				ColorRGB finalColor{ gradient, gradient, gradient };*/
 
 				//Update Color in Buffer
 				finalColor.MaxToOne();
@@ -118,9 +113,161 @@ void Renderer::Renderer_W1_Part1()
 	}
 }
 
+void Renderer::Renderer_W1_Part2()
+{
+	//Define Triangle - Vertices in NDC space
+	std::vector<Vertex> vertices_world
+	{
+		{{ 0.0f, 2.0f, 0.0f }},
+		{{ 1.0f, 0.0f, 0.0f }},
+		{{ -1.0f, 0.0f, 0.0f }}
+	};
+
+	/*
+	================
+	Projection stage
+	================
+	*/
+	std::vector<Vertex> vertices_screenSpace;
+	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+
+	/*
+	================
+	Rasterization stage
+	================
+	*/
+	//Loop through all vertices 
+	for (int px{}; px < m_Width; ++px)
+	{
+		for (int py{}; py < m_Height; ++py)
+		{
+			Vector2 pixel_ScreenSpace{ float(px), float(py) };
+
+			bool pixelInTriangle{ true };
+
+			// Check edges
+			for (int edgeIndex = 0; edgeIndex < 3; ++edgeIndex)
+			{
+				int nextIndex = (edgeIndex + 1) % 3;
+				auto edge = vertices_screenSpace[nextIndex].position.GetXY() - vertices_screenSpace[edgeIndex].position.GetXY();
+				auto pointToPixel = pixel_ScreenSpace - vertices_screenSpace[edgeIndex].position.GetXY();
+
+				if (Vector2::Cross(edge, pointToPixel) < 0)
+				{
+					pixelInTriangle = false;
+					break;
+				}
+			}
+
+			ColorRGB finalColor{};
+			if (pixelInTriangle) finalColor = ColorRGB{ 1.0f, 1.0f, 1.0f };
+
+			// Update Color in Buffer
+			finalColor.MaxToOne();
+
+			m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+				static_cast<uint8_t>(finalColor.r * 255),
+				static_cast<uint8_t>(finalColor.g * 255),
+				static_cast<uint8_t>(finalColor.b * 255));
+		}
+	}
+}
+
+void dae::Renderer::Renderer_W1_Part3()
+{
+	//Define Triangle - Vertices in NDC space
+	std::vector<Vertex> vertices_world
+	{
+		{{ 0.0f, 4.0f, 2.0f }, {1, 0, 0}},
+		{{ 3.0f, -2.0f, 2.0f }, {0, 1, 0}},
+		{{ -3.0f, -2.0f, 2.0f }, {0, 0, 1}}
+	};
+
+	/*
+	================
+	Projection stage
+	================
+	*/
+	std::vector<Vertex> vertices_screenSpace;
+	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+
+	/*
+	================
+	Rasterization stage
+	================
+	*/
+	//Loop through all vertices 
+	for (int px{}; px < m_Width; ++px)
+	{
+		for (int py{}; py < m_Height; ++py)
+		{
+			Vector2 pixel_ScreenSpace{ float(px), float(py) };
+
+			bool pixelInTriangle{ true };
+
+			float weights[3]{};
+			float totalArea{};
+
+			// Check edges
+			for (int edgeIdx{}; edgeIdx < 3; ++edgeIdx)
+			{
+				int nextIndex{ (edgeIdx + 1) % 3 };
+				int weightIndex{ (edgeIdx + 2) % 3 };
+
+				auto edge{ vertices_screenSpace[nextIndex].position.GetXY() - vertices_screenSpace[edgeIdx].position.GetXY() };
+				auto pointToPixel{ pixel_ScreenSpace - vertices_screenSpace[edgeIdx].position.GetXY() };
+				auto weight{ Vector2::Cross(edge, pointToPixel) };
+
+				if (weight < 0)
+				{
+					pixelInTriangle = false;
+					break;
+				}
+
+				totalArea += weight;
+				weights[weightIndex] = weight;
+			}
+
+			ColorRGB finalColor{};
+			if (pixelInTriangle) 
+			{
+				finalColor = (weights[0] / totalArea) * vertices_screenSpace[0].color + (weights[1] / totalArea) * vertices_screenSpace[1].color + (weights[2] / totalArea) * vertices_screenSpace[2].color;
+			}
+
+			// Update Color in Buffer
+			finalColor.MaxToOne();
+
+			m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+				static_cast<uint8_t>(finalColor.r * 255),
+				static_cast<uint8_t>(finalColor.g * 255),
+				static_cast<uint8_t>(finalColor.b * 255));
+		}
+	}
+}
+
 void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const
 {
+	vertices_out.clear();
+	vertices_out.reserve(vertices_in.size());
+
 	//Todo > W1 Projection Stage
+	for (int idx{}; idx < vertices_in.size(); ++idx)
+	{
+		const Vector3 v_viewspace{m_Camera.viewMatrix.TransformPoint(vertices_in[idx].position) };
+		Vector3 v_projected{};
+
+		v_projected.x = v_viewspace.x / v_viewspace.z;
+		v_projected.y = v_viewspace.y / v_viewspace.z;
+		v_projected.z = v_viewspace.z;
+
+		v_projected.x = v_projected.x / (m_AspectRatio * m_Camera.fov);
+		v_projected.y = v_projected.y / m_Camera.fov;
+
+		v_projected.x = ((v_projected.x + 1) / 2.f) * m_Width;
+		v_projected.y = ((1 - v_projected.y) / 2.f) * m_Height;
+
+		vertices_out.emplace_back(v_projected, vertices_in[idx].color);
+	}
 }
 
 bool Renderer::SaveBufferToImage() const

@@ -50,6 +50,7 @@ namespace dae
 		//float* m_pDepthBufferPixels{};
 
 		Camera m_Camera{};
+		float m_AspectRatio{};
 
 		int m_Width{};
 		int m_Height{};
