@@ -21,18 +21,18 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pBackBuffer = SDL_CreateRGBSurface(0, m_Width, m_Height, 32, 0, 0, 0, 0);
 	m_pBackBufferPixels = (uint32_t*)m_pBackBuffer->pixels;
 
-	//m_pDepthBufferPixels = new float[m_Width * m_Height];
+	m_pDepthBufferPixels = new float[m_Width * m_Height];
 
 	//Initialize Camera
 	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
 
-	//Globalize aspectratio
+	// globalize aspectratio
 	m_AspectRatio = m_Width / static_cast<float>(m_Height);
 }
 
 Renderer::~Renderer()
 {
-	//delete[] m_pDepthBufferPixels;
+	delete[] m_pDepthBufferPixels;
 }
 
 void Renderer::Update(Timer* pTimer)
@@ -46,17 +46,28 @@ void Renderer::Render()
 	//Lock BackBuffer
 	SDL_LockSurface(m_pBackBuffer);
 
-	//Renderer_W1_Part1(); //Rasterizer Stage Only
-	//Renderer_W1_Part2(); //Projection Stage (Camera)
-	Renderer_W1_Part3(); //Barycentric coordinates
-	//Renderer_W1_Part4(); //Depth Buffer
-	//Renderer_W1_Part5(); //BoundingBox Optimization
+	// create float array
+	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, std::numeric_limits<float>::max());
 
+	// clear BackBuffer
+	SDL_FillRect(m_pBackBuffer, nullptr, SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100));
+
+	Renderer_W1();
+	
 	//@END
 	//Update SDL Surface
 	SDL_UnlockSurface(m_pBackBuffer);
 	SDL_BlitSurface(m_pBackBuffer, 0, m_pFrontBuffer, 0);
 	SDL_UpdateWindowSurface(m_pWindow);
+}
+
+void dae::Renderer::Renderer_W1()
+{
+	//Renderer_W1_Part1(); //Rasterizer Stage Only
+	//Renderer_W1_Part2(); //Projection Stage (Camera)
+	//Renderer_W1_Part3(); //Barycentric coordinates
+	//Renderer_W1_Part4(); //Depth Buffer
+	Renderer_W1_Part5(); //BoundingBox Optimization
 }
 
 void Renderer::Renderer_W1_Part1()
@@ -112,7 +123,6 @@ void Renderer::Renderer_W1_Part1()
 		}
 	}
 }
-
 void Renderer::Renderer_W1_Part2()
 {
 	//Define Triangle - Vertices in NDC space
@@ -172,7 +182,6 @@ void Renderer::Renderer_W1_Part2()
 		}
 	}
 }
-
 void dae::Renderer::Renderer_W1_Part3()
 {
 	//Define Triangle - Vertices in NDC space
@@ -241,6 +250,196 @@ void dae::Renderer::Renderer_W1_Part3()
 				static_cast<uint8_t>(finalColor.r * 255),
 				static_cast<uint8_t>(finalColor.g * 255),
 				static_cast<uint8_t>(finalColor.b * 255));
+		}
+	}
+}
+void dae::Renderer::Renderer_W1_Part4()
+{
+	//Define Triangle - Vertices in world space
+	std::vector<Vertex> vertices_world
+	{
+		// RGB triangle
+		{ {0.0f, 4.0f, 2.0f}, {1, 0, 0} },
+		{ {3.0f, -2.0f, 2.0f}, {0, 1, 0} },
+		{ {-3.0f, -2.0f, 2.0f}, {0, 0, 1} },
+
+		//RED triangle
+		{ {0.0f, 2.0f, 0.0f}, {1, 0, 0} },
+		{ {1.5f, -1.0f, 0.0f}, {1, 0, 0} },
+		{ {-1.5f, -1.0f, 0.0f}, {1, 0, 0} }
+	};
+
+	/*
+	================
+	Projection stage
+	================
+	*/
+	std::vector<Vertex> vertices_screenSpace;
+	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+
+	/*
+	================
+	Rasterization stage
+	================
+	*/
+	//Loop through all vertices 
+	for (int triangleIdx{}; triangleIdx < vertices_screenSpace.size(); triangleIdx += 3)
+	{
+		for (int px{}; px < m_Width; ++px)
+		{
+			for (int py{}; py < m_Height; ++py)
+			{
+				Vector2 pixel_ScreenSpace{ float(px), float(py) };
+
+				bool pixelInTriangle{ true };
+
+				float weights[3]{};
+				float totalArea{};
+
+				// Check edges
+				for (int edgeIdx{}; edgeIdx < 3; ++edgeIdx)
+				{
+					int nextIndex{ (edgeIdx + 1) % 3 };
+					int weightIndex{ (edgeIdx + 2) % 3 };
+
+					auto edge{ vertices_screenSpace[triangleIdx + nextIndex].position.GetXY() - vertices_screenSpace[triangleIdx + edgeIdx].position.GetXY() };
+					auto pointToPixel{ pixel_ScreenSpace - vertices_screenSpace[triangleIdx + edgeIdx].position.GetXY() };
+					auto weight{ Vector2::Cross(edge, pointToPixel) };
+
+					if (weight < 0)
+					{
+						pixelInTriangle = false;
+						break;
+					}
+
+					totalArea += weight;
+					weights[weightIndex] = weight;
+				}
+
+				ColorRGB finalColor{};
+				if (pixelInTriangle)
+				{
+					float depth{ (weights[0] / totalArea) * vertices_screenSpace[triangleIdx].position.z + (weights[1] / totalArea) * vertices_screenSpace[triangleIdx + 1].position.z + (weights[2] / totalArea) * vertices_screenSpace[triangleIdx + 2].position.z };
+					if (depth < m_pDepthBufferPixels[px + (py * m_Width)])
+					{
+						m_pDepthBufferPixels[px + (py * m_Width)] = depth;
+						finalColor = (weights[0] / totalArea) * vertices_screenSpace[triangleIdx].color + (weights[1] / totalArea) * vertices_screenSpace[triangleIdx + 1].color + (weights[2] / totalArea) * vertices_screenSpace[triangleIdx + 2].color;
+
+						// Update Color in Buffer
+						finalColor.MaxToOne();
+
+						m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+							static_cast<uint8_t>(finalColor.r * 255),
+							static_cast<uint8_t>(finalColor.g * 255),
+							static_cast<uint8_t>(finalColor.b * 255));
+					}
+				}
+
+
+			}
+		}
+	}
+}
+void dae::Renderer::Renderer_W1_Part5()
+{
+	//Define Triangle - Vertices in world space
+	std::vector<Vertex> vertices_world
+	{
+		// RGB triangle
+		{ {0.0f, 4.0f, 2.0f}, {1, 0, 0} },
+		{ {3.0f, -2.0f, 2.0f}, {0, 1, 0} },
+		{ {-3.0f, -2.0f, 2.0f}, {0, 0, 1} },
+
+		//RED triangle
+		{ {0.0f, 2.0f, 0.0f}, {1, 0, 0} },
+		{ {1.5f, -1.0f, 0.0f}, {1, 0, 0} },
+		{ {-1.5f, -1.0f, 0.0f}, {1, 0, 0} }
+	};
+
+	/*
+	================
+	Projection stage
+	================
+	*/
+	std::vector<Vertex> vertices_screenSpace;
+	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+
+	/*
+	================
+	Rasterization stage
+	================
+	*/
+	//Loop through all vertices 
+	for (int triangleIdx{}; triangleIdx < vertices_screenSpace.size(); triangleIdx += 3)
+	{
+		// create const variables for reusability
+		const Vector2 v0{ vertices_screenSpace[triangleIdx].position.GetXY() };
+		const Vector2 v1{ vertices_screenSpace[triangleIdx + 1].position.GetXY() };
+		const Vector2 v2{ vertices_screenSpace[triangleIdx + 2].position.GetXY() };
+
+
+		// create bounding box
+		int minX{ static_cast<int>(std::min(v0.x, std::min(v1.x, v2.x))) };
+		int maxX{ static_cast<int>(std::max(v0.x, std::max(v1.x, v2.x))) };
+		int minY{ static_cast<int>(std::min(v0.y, std::min(v1.y, v2.y))) };
+		int maxY{ static_cast<int>(std::max(v0.y, std::max(v1.y, v2.y))) };
+
+		// clamp box to screen
+		minX = std::max(minX, 0);
+		maxX = std::min(maxX, m_Width - 1);
+		minY = std::max(minY, 0);
+		maxY = std::min(maxY, m_Height - 1);
+
+		for (int px{ minX }; px < maxX; ++px)
+		{
+			for (int py{ minY }; py < maxY; ++py)
+			{
+				Vector2 pixel_ScreenSpace{ float(px), float(py) };
+
+				bool pixelInTriangle{ true };
+
+				float weights[3]{};
+				float totalArea{};
+
+				// Check edges
+				for (int edgeIdx{}; edgeIdx < 3; ++edgeIdx)
+				{
+					int nextIndex{ (edgeIdx + 1) % 3 };
+					int weightIndex{ (edgeIdx + 2) % 3 };
+
+					auto edge{ vertices_screenSpace[triangleIdx + nextIndex].position.GetXY() - vertices_screenSpace[triangleIdx + edgeIdx].position.GetXY() };
+					auto pointToPixel{ pixel_ScreenSpace - vertices_screenSpace[triangleIdx + edgeIdx].position.GetXY() };
+					auto weight{ Vector2::Cross(edge, pointToPixel) };
+
+					if (weight < 0)
+					{
+						pixelInTriangle = false;
+						break;
+					}
+
+					totalArea += weight;
+					weights[weightIndex] = weight;
+				}
+
+				ColorRGB finalColor{};
+				if (pixelInTriangle)
+				{
+					float depth{ (weights[0] / totalArea) * vertices_screenSpace[triangleIdx].position.z + (weights[1] / totalArea) * vertices_screenSpace[triangleIdx + 1].position.z + (weights[2] / totalArea) * vertices_screenSpace[triangleIdx + 2].position.z };
+					if (depth < m_pDepthBufferPixels[px + (py * m_Width)])
+					{
+						m_pDepthBufferPixels[px + (py * m_Width)] = depth;
+						finalColor = (weights[0] / totalArea) * vertices_screenSpace[triangleIdx].color + (weights[1] / totalArea) * vertices_screenSpace[triangleIdx + 1].color + (weights[2] / totalArea) * vertices_screenSpace[triangleIdx + 2].color;
+
+						// Update Color in Buffer
+						finalColor.MaxToOne();
+
+						m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+							static_cast<uint8_t>(finalColor.r * 255),
+							static_cast<uint8_t>(finalColor.g * 255),
+							static_cast<uint8_t>(finalColor.b * 255));
+					}
+				}
+			}
 		}
 	}
 }

@@ -30,6 +30,7 @@ namespace dae
 		void Update(Timer* pTimer);
 		void Render();
 
+		void Renderer_W1();
 		void Renderer_W1_Part1();
 		void Renderer_W1_Part2();
 		void Renderer_W1_Part3();
@@ -47,7 +48,7 @@ namespace dae
 		SDL_Surface* m_pBackBuffer{ nullptr };
 		uint32_t* m_pBackBufferPixels{};
 
-		//float* m_pDepthBufferPixels{};
+		float* m_pDepthBufferPixels{};
 
 		Camera m_Camera{};
 		float m_AspectRatio{};
