@@ -1,6 +1,9 @@
 #pragma once
 #include <cfloat>
 #include <cmath>
+#include <array>
+
+#include "Vector2.h"
 
 namespace dae
 {
@@ -57,4 +60,44 @@ namespace dae
 		if (v > 1.f) return 1.f;
 		return v;
 	}
+
+	inline bool IsPointInTriangle(const Vector2& point, const Vector2& v0, const Vector2& v1, const Vector2& v2)
+	{
+		if (point == v0 or point == v1 or point == v2) return true;
+
+		const Vector2 v0v1 = v1 - v0;
+		const Vector2 v1v2 = v2 - v1;
+		const Vector2 v2v0 = v0 - v2;
+
+		if (Vector2::Cross(v0v1, point - v0) < 0) return false;
+		if (Vector2::Cross(v1v2, point - v1) < 0) return false;
+		if (Vector2::Cross(v2v0, point - v2) < 0) return false;
+
+		return true;
+	}
+
+	inline bool IsPointInTriangle(const Vector2& point, const Vector2& v0, const Vector2& v1, const Vector2& v2, std::array<float, 3>& weights)
+	{
+		if (point == v0 or point == v1 or point == v2) return true;
+
+		const Vector2 v0v1 = v1 - v0;
+		const Vector2 v1v2 = v2 - v1;
+		const Vector2 v2v0 = v0 - v2;
+
+		weights[0] = Vector2::Cross(v1v2, point - v1);
+		weights[1] = Vector2::Cross(v2v0, point - v2);
+		weights[2] = Vector2::Cross(v0v1, point - v0);
+
+		if (weights[0] < 0) return false;
+		if (weights[1] < 0) return false;
+		if (weights[2] < 0) return false;
+
+		const float area = 1.0f / Vector2::Cross(v0v1, v1v2);
+		weights[0] *= area;
+		weights[1] *= area;
+		weights[2] *= area;
+
+		return true;
+	}
+
 }

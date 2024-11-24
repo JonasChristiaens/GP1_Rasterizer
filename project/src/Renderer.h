@@ -37,6 +37,13 @@ namespace dae
 		void Renderer_W1_Part4();
 		void Renderer_W1_Part5();
 
+		void Renderer_W2();
+		void Renderer_W2_Part1();
+		void Renderer_W2_Part2();
+		void Renderer_W2_Part3();
+		void Renderer_W2_Part4();
+		void Renderer_W2_Part5();
+
 		bool SaveBufferToImage() const;
 
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const;
