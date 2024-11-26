@@ -39,14 +39,13 @@ namespace dae
 
 		void Renderer_W2();
 		void Renderer_W2_Part1();
-		void Renderer_W2_Part2();
-		void Renderer_W2_Part3();
-		void Renderer_W2_Part4();
-		void Renderer_W2_Part5();
+		void Renderer_W2_Part2_TriangleStrip();
+		void Renderer_W2_Part2_TriangleList();
 
+		bool IsPointInTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2, const Vector2& pixel);
 		bool SaveBufferToImage() const;
 
-		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const;
+		void VertexTransformationFunction(Mesh& mesh) const;
 
 	private:
 		SDL_Window* m_pWindow{};
@@ -57,10 +56,13 @@ namespace dae
 
 		float* m_pDepthBufferPixels{};
 
+		Texture* m_pTexture;
 		Camera m_Camera{};
-		float m_AspectRatio{};
 
 		int m_Width{};
 		int m_Height{};
+
+		float weights[3]{};
+		float m_Aspectratio{};
 	};
 }

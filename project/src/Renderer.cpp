@@ -9,6 +9,54 @@
 #include "Utils.h"
 
 using namespace dae;
+std::vector<Mesh> meshes_world
+{
+	Mesh
+	{
+		{
+			Vertex{{-3.f, 3.f, -2.f}, {}, {0.f, 0.f}},
+			Vertex{{ 0.f, 3.f, -2.f}, {}, {.5f, 0.f}},
+			Vertex{{ 3.f, 3.f, -2.f}, {}, {1.f, 0.f}},
+			Vertex{{-3.f, 0.f, -2.f}, {}, {0.f, .5f}},
+			Vertex{{ 0.f, 0.f, -2.f}, {}, {.5f, .5f}},
+			Vertex{{ 3.f, 0.f, -2.f}, {}, {1.f, .5f}},
+			Vertex{{-3.f, -3.f, -2.f}, {}, {0.f, 1.f}},
+			Vertex{{ 0.f, -3.f, -2.f}, {}, {.5f, 1.f}},
+			Vertex{{ 3.f, -3.f, -2.f}, {}, {1.f, 1.f}}
+		},
+		{
+			3, 0, 4, 1, 5, 2,
+			2, 6,    // degenerate triangle
+			6, 3, 7, 4, 8, 5
+		},
+		PrimitiveTopology::TriangleStrip
+	}
+};
+
+//std::vector<Mesh> meshes_world
+//{
+//    Mesh
+//    {
+//        {
+//            Vertex{{-3,  3, -2}},
+//            Vertex{{ 0,  3, -2}},
+//            Vertex{{ 3,  3, -2}},
+//            Vertex{{-3,  0, -2}},
+//            Vertex{{ 0,  0, -2}},
+//            Vertex{{ 3,  0, -2}},
+//            Vertex{{-3, -3, -2}},
+//            Vertex{{ 0, -3, -2}},
+//            Vertex{{ 3, -3, -2}},
+//        },
+//        {
+//            3, 0, 1,    1, 4, 3,    4, 1, 2,
+//            2, 5, 4,    6, 3, 4,    4, 7, 6,
+//            7, 4, 5,    5, 8, 7
+//
+//        },
+//        PrimitiveTopology::TriangleList
+//    }
+//};
 
 Renderer::Renderer(SDL_Window* pWindow) :
 	m_pWindow(pWindow)
@@ -21,15 +69,13 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pBackBuffer = SDL_CreateRGBSurface(0, m_Width, m_Height, 32, 0, 0, 0, 0);
 	m_pBackBufferPixels = (uint32_t*)m_pBackBuffer->pixels;
 
+	m_Aspectratio = (m_Width / static_cast<float>(m_Height));
+
 	m_pDepthBufferPixels = new float[m_Width * m_Height];
 
 	//Initialize Camera
 	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
-
-	// globalize aspectratio
-	m_AspectRatio = m_Width / static_cast<float>(m_Height);
 }
-
 Renderer::~Renderer()
 {
 	delete[] m_pDepthBufferPixels;
@@ -39,7 +85,6 @@ void Renderer::Update(Timer* pTimer)
 {
 	m_Camera.Update(pTimer);
 }
-
 void Renderer::Render()
 {
 	//@START
@@ -139,7 +184,7 @@ void Renderer::Renderer_W1_Part2()
 	================
 	*/
 	std::vector<Vertex> vertices_screenSpace;
-	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+	//VertexTransformationFunction(vertices_world, vertices_screenSpace);
 
 	/*
 	================
@@ -198,7 +243,7 @@ void Renderer::Renderer_W1_Part3()
 	================
 	*/
 	std::vector<Vertex> vertices_screenSpace;
-	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+	//VertexTransformationFunction(vertices_world, vertices_screenSpace);
 
 	/*
 	================
@@ -275,7 +320,7 @@ void Renderer::Renderer_W1_Part4()
 	================
 	*/
 	std::vector<Vertex> vertices_screenSpace;
-	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+	//VertexTransformationFunction(vertices_world, vertices_screenSpace);
 
 	/*
 	================
@@ -362,7 +407,7 @@ void Renderer::Renderer_W1_Part5()
 	================
 	*/
 	std::vector<Vertex> vertices_screenSpace;
-	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+	//VertexTransformationFunction(vertices_world, vertices_screenSpace);
 
 	/*
 	================
@@ -447,7 +492,17 @@ void Renderer::Renderer_W1_Part5()
 void Renderer::Renderer_W2()
 {
 	//Renderer_W2_Part1(); //Implementing Quads
-	Renderer_W2_Part2(); //Triangle Strip
+	switch (meshes_world.at(0).primitiveTopology)
+	{
+	case PrimitiveTopology::TriangleList:
+		Renderer_W2_Part2_TriangleList(); //triangle list
+		break;
+	case PrimitiveTopology::TriangleStrip:
+		Renderer_W2_Part2_TriangleStrip(); //triangle strip
+		break;
+	default:
+		break;
+	}
 	//Renderer_W2_Part3(); //Barycentric coordinates
 	//Renderer_W2_Part4(); //Depth Buffer
 	//Renderer_W2_Part5(); //BoundingBox Optimization
@@ -487,7 +542,7 @@ void Renderer::Renderer_W2_Part1()
 	================
 	*/
 	std::vector<Vertex> vertices_screenSpace;
-	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+	//VertexTransformationFunction(vertices_world, vertices_screenSpace);
 
 	/*
 	================
@@ -568,42 +623,16 @@ void Renderer::Renderer_W2_Part1()
 		}
 	}
 }
-void Renderer::Renderer_W2_Part2()
+void dae::Renderer::Renderer_W2_Part2_TriangleStrip()
 {
-	// define triangle - Vertices in world space
-	std::vector<Vertex> vertices_world
-    {
-        // quad vertices
-        { {-3,  3, -2}, {1, 1, 1} },
-        { { 0,  3, -2}, {1, 1, 1} },
-        { { 3,  3, -2}, {1, 1, 1} },
-        { {-3,  0, -2}, {1, 1, 1} },
-        { { 0,  0, -2}, {1, 1, 1} },
-        { { 3,  0, -2}, {1, 1, 1} },
-        { {-3, -3, -2}, {1, 1, 1} },
-        { { 0, -3, -2}, {1, 1, 1} },
-        { { 3, -3, -2}, {1, 1, 1} }
-    };
-
-	// define triangle strip indices
-	std::vector<int> triangleIndices
-	{
-		3, 0, 4,
-		1, 5, 2,
-		2, 6,	// degenerate triangle
-		6, 3, 7,
-		4, 8, 5
-	};
-
 	// transform vertices to screen space
-	std::vector<Vertex> vertices_screenSpace;
-	VertexTransformationFunction(vertices_world, vertices_screenSpace);
+	VertexTransformationFunction(meshes_world.at(0));
 
-	for (size_t idx = 0; idx < triangleIndices.size() - 2; ++idx)
+	for (size_t idx = 0; idx < meshes_world.at(0).indices.size() - 2; ++idx)
 	{
-		const int idx0 = triangleIndices[idx];
-		const int idx1 = triangleIndices[idx + 1];
-		const int idx2 = triangleIndices[idx + 2];
+		const int idx0 = meshes_world.at(0).indices[idx];
+		const int idx1 = meshes_world.at(0).indices[idx + 1];
+		const int idx2 = meshes_world.at(0).indices[idx + 2];
 
 		// check for degenerate triangles
 		if (idx0 == idx1 || idx1 == idx2 || idx2 == idx0) continue;
@@ -613,13 +642,9 @@ void Renderer::Renderer_W2_Part2()
 		int v2Index = (idx & 1) ? idx1 : idx2;
 
 		// fetch vertices
-		const Vertex& v0 = vertices_screenSpace[idx0];
-		const Vertex& v1 = vertices_screenSpace[v1Index];
-		const Vertex& v2 = vertices_screenSpace[v2Index];
-
-		const Vector2 p0 = v0.position.GetXY();
-		const Vector2 p1 = v1.position.GetXY();
-		const Vector2 p2 = v2.position.GetXY();
+		const Vector2 p0 = meshes_world.at(0).vertices_out[idx0].position.GetXY();
+		const Vector2 p1 = meshes_world.at(0).vertices_out[v1Index].position.GetXY();
+		const Vector2 p2 = meshes_world.at(0).vertices_out[v2Index].position.GetXY();
 
 		// compute bounding box
 		int minX = static_cast<int>(std::min(p0.x, std::min(p1.x, p2.x)));
@@ -631,7 +656,88 @@ void Renderer::Renderer_W2_Part2()
 		minX = std::max(minX, 0);
 		maxX = std::min(maxX, m_Width - 1);
 		minY = std::max(minY, 0);
-		maxY = std::min(maxY, m_Height - 1);	
+		maxY = std::min(maxY, m_Height - 1);
+
+		// iterate over pixels within bounding box
+		for (int px = minX; px <= maxX; ++px)
+		{
+			for (int py = minY; py <= maxY; ++py)
+			{
+				Vector2 pixel = { static_cast<float>(px) + 0.5f, static_cast<float>(py) + 0.5f };
+
+				if (IsPointInTriangle(p0, p1, p2, pixel))
+				{
+					// interpolate uv
+					const Vector2 uv
+					{
+						meshes_world.at(0).vertices_out[idx].uv * weights[0] +
+						meshes_world.at(0).vertices_out[idx + 1].uv * weights[1] +
+						meshes_world.at(0).vertices_out[idx + 2].uv * weights[2]
+					};
+
+					// interpolate depth
+					float depth =
+						weights[0] * meshes_world.at(0).vertices_out[idx0].position.z +
+						weights[1] * meshes_world.at(0).vertices_out[v1Index].position.z +
+						weights[2] * meshes_world.at(0).vertices_out[v2Index].position.z;
+
+					int bufferIdx = px + py * m_Width;
+
+					// Z-test
+					if (depth < m_pDepthBufferPixels[bufferIdx])
+					{
+						m_pDepthBufferPixels[bufferIdx] = depth;
+
+						// interpolate color
+						ColorRGB finalColor = m_pTexture->Sample(uv);
+
+						// update Color in Buffer
+						finalColor.MaxToOne();
+
+						m_pBackBufferPixels[bufferIdx] = SDL_MapRGB(m_pBackBuffer->format,
+							static_cast<uint8_t>(finalColor.r * 255),
+							static_cast<uint8_t>(finalColor.g * 255),
+							static_cast<uint8_t>(finalColor.b * 255));
+					}
+				}
+			}
+		}
+	}
+}
+void dae::Renderer::Renderer_W2_Part2_TriangleList()
+{
+	// transform vertices to screen space
+	VertexTransformationFunction(meshes_world.at(0));
+
+	for (size_t idx = 0; idx < meshes_world.at(0).indices.size() - 2; ++idx)
+	{
+		const int idx0 = meshes_world.at(0).indices[idx];
+		const int idx1 = meshes_world.at(0).indices[idx + 1];
+		const int idx2 = meshes_world.at(0).indices[idx + 2];
+
+		// check for degenerate triangles
+		if (idx0 == idx1 || idx1 == idx2 || idx2 == idx0) continue;
+
+		// precompute alternate winding
+		int v1Index = (idx & 1) ? idx2 : idx1;
+		int v2Index = (idx & 1) ? idx1 : idx2;
+
+		// fetch vertices
+		const Vector2 p0 = meshes_world.at(0).vertices_out[idx0].position.GetXY();
+		const Vector2 p1 = meshes_world.at(0).vertices_out[v1Index].position.GetXY();
+		const Vector2 p2 = meshes_world.at(0).vertices_out[v2Index].position.GetXY();
+
+		// compute bounding box
+		int minX = static_cast<int>(std::min(p0.x, std::min(p1.x, p2.x)));
+		int maxX = static_cast<int>(std::max(p0.x, std::max(p1.x, p2.x)));
+		int minY = static_cast<int>(std::min(p0.y, std::min(p1.y, p2.y)));
+		int maxY = static_cast<int>(std::max(p0.y, std::max(p1.y, p2.y)));
+
+		// clamp bounding box to screen
+		minX = std::max(minX, 0);
+		maxX = std::min(maxX, m_Width - 1);
+		minY = std::max(minY, 0);
+		maxY = std::min(maxY, m_Height - 1);
 
 		// tterate over pixels within bounding box
 		for (int px = minX; px <= maxX; ++px)
@@ -640,14 +746,13 @@ void Renderer::Renderer_W2_Part2()
 			{
 				Vector2 pixel = { static_cast<float>(px) + 0.5f, static_cast<float>(py) + 0.5f };
 
-				std::array<float, 3> weights;
-				if (IsPointInTriangle(pixel, p0, p1, p2, weights))
+				if (IsPointInTriangle(p0, p1, p2, pixel))
 				{
 					// tnterpolate depth
-					float depth = 
-						weights[0] * v0.position.z +
-						weights[1] * v1.position.z +
-						weights[2] * v2.position.z;
+					float depth =
+						weights[0] * meshes_world.at(0).vertices_out[idx0].position.z +
+						weights[1] * meshes_world.at(0).vertices_out[v1Index].position.z +
+						weights[2] * meshes_world.at(0).vertices_out[v2Index].position.z;
 
 					int bufferIdx = px + py * m_Width;
 
@@ -658,9 +763,9 @@ void Renderer::Renderer_W2_Part2()
 
 						// interpolate color
 						ColorRGB finalColor =
-							weights[0] * v0.color +
-							weights[1] * v1.color +
-							weights[2] * v2.color;
+							weights[0] * meshes_world.at(0).vertices_out[idx0].color +
+							weights[1] * meshes_world.at(0).vertices_out[v1Index].color +
+							weights[2] * meshes_world.at(0).vertices_out[v2Index].color;
 
 						// update Color in Buffer
 						finalColor.MaxToOne();
@@ -676,30 +781,46 @@ void Renderer::Renderer_W2_Part2()
 	}
 }
 
-void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const
+void Renderer::VertexTransformationFunction(Mesh& mesh) const
 {
-	vertices_out.clear();
-	vertices_out.reserve(vertices_in.size());
+	mesh.vertices_out.clear();
+	mesh.vertices_out.reserve(mesh.vertices.size());
 
 	//Todo > W1 Projection Stage
-	for (int idx{}; idx < vertices_in.size(); ++idx)
+	for (int idx{}; idx < mesh.vertices.size(); ++idx)
 	{
-		const Vector3 v_viewspace{m_Camera.viewMatrix.TransformPoint(vertices_in[idx].position) };
+		const Vector3 v_viewspace{ m_Camera.viewMatrix.TransformPoint(mesh.vertices[idx].position) };
 		Vector3 v_projected{};
 
 		v_projected.x = v_viewspace.x / v_viewspace.z;
 		v_projected.y = v_viewspace.y / v_viewspace.z;
 		v_projected.z = v_viewspace.z;
 
-		v_projected.x = v_projected.x / (m_AspectRatio * m_Camera.fov);
+		v_projected.x = v_projected.x / (m_Aspectratio * m_Camera.fov);
 		v_projected.y = v_projected.y / m_Camera.fov;
 
 		v_projected.x = ((v_projected.x + 1) / 2.f) * m_Width;
 		v_projected.y = ((1 - v_projected.y) / 2.f) * m_Height;
 
-		vertices_out.emplace_back(v_projected, vertices_in[idx].color);
+		mesh.vertices_out.emplace_back(v_projected, mesh.vertices[idx].color, mesh.vertices[idx].uv);
 	}
 }
+
+bool dae::Renderer::IsPointInTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2, const Vector2& pixel)
+{
+	if (pixel == v0 || pixel == v1 || pixel == v2) return true;
+
+	weights[2] = Vector2::Cross(v1 - v0, pixel - v0);
+	weights[0] = Vector2::Cross(v2 - v1, pixel - v1);
+	weights[1] = Vector2::Cross(v0 - v2, pixel - v2);
+
+	if (weights[0] < 0) return false;
+	if (weights[1] < 0) return false;
+	if (weights[2] < 0) return false;
+
+	return true;
+}
+
 bool Renderer::SaveBufferToImage() const
 {
 	return SDL_SaveBMP(m_pBackBuffer, "Rasterizer_ColorBuffer.bmp");
