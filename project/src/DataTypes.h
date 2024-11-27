@@ -16,6 +16,13 @@ namespace dae
 
 	struct Vertex_Out
 	{
+		Vertex_Out(const Vector4& pos, const ColorRGB& col, const Vector2& uv):
+			position{pos}, color{col}, uv{uv}{}
+
+		Vertex_Out(const Vector3& pos, const ColorRGB& col, const Vector2& uv) :
+			position{ pos, 0.f }, color{ col }, uv{ uv } {
+		}
+
 		Vector4 position{};
 		ColorRGB color{ colors::White };
 		Vector2 uv{};

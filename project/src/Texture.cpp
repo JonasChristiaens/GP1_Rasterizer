@@ -1,6 +1,8 @@
 #include "Texture.h"
 #include "Vector2.h"
 #include <SDL_image.h>
+#include <iostream>
+#include "MathHelpers.h"
 
 namespace dae
 {
@@ -23,10 +25,10 @@ namespace dae
     {
         //TODO
         //Load SDL_Surface using IMG_LOAD
-        //Create & Return a new Texture Object (using SDL_Surface)
         SDL_Surface* pSurface = IMG_Load(path.c_str());
         if (!pSurface) return nullptr;
 
+        //Create & Return a new Texture Object (using SDL_Surface)
         return new Texture(pSurface);
     }
 
@@ -34,8 +36,8 @@ namespace dae
     {
         //TODO
         //Sample the correct texel for the given uv
-        const float u{ std::ranges::clamp(uv.x, 0.f, 1.f) * float(m_pSurface->w) };
-        const float v{ std::ranges::clamp(uv.y, 0.f, 1.f) * float(m_pSurface->h) };
+        const float u{ dae::Clamp(uv.x, 0.f, 1.f) * float(m_pSurface->w) };
+        const float v{ dae::Clamp(uv.y, 0.f, 1.f) * float(m_pSurface->h) };
 
         const int index{ static_cast<int>(u) + (static_cast<int>(v) * m_pSurface->w) };
 

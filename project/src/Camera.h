@@ -30,8 +30,11 @@ namespace dae
 		float totalPitch{};
 		float totalYaw{};
 
+		Matrix worldMatrix{ {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
 		Matrix invViewMatrix{};
 		Matrix viewMatrix{};
+		Matrix projectionMatrix{};
+		Matrix worldViewProjectionMatrix{};
 
 		void Initialize(float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f})
 		{
@@ -57,15 +60,17 @@ namespace dae
 			//DirectX Implementation => https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixlookatlh
 		}
 
-		void CalculateProjectionMatrix()
+		void CalculateProjectionMatrix(float aspectRatio)
 		{
 			//TODO W3
-
-			//ProjectionMatrix => Matrix::CreatePerspectiveFovLH(...) [not implemented yet]
 			//DirectX Implementation => https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixperspectivefovlh
+			projectionMatrix = Matrix::CreatePerspectiveFovLH(fov, aspectRatio, 0.0f, 1.0f);
+
+			// combine all space transformation matrix into one matrix
+			worldViewProjectionMatrix = worldMatrix * viewMatrix * projectionMatrix;
 		}
 
-		void Update(Timer* pTimer)
+		void Update(Timer* pTimer, float aspectRatio)
 		{
 			//Camera Update Logic
 			const float deltaTime = pTimer->GetElapsed();
@@ -120,7 +125,7 @@ namespace dae
 
 			//Update Matrices
 			CalculateViewMatrix();
-			CalculateProjectionMatrix(); //Try to optimize this - should only be called once or when fov/aspectRatio changes
+			CalculateProjectionMatrix(aspectRatio); //Try to optimize this - should only be called once or when fov/aspectRatio changes
 		}
 	};
 }

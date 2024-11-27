@@ -28,11 +28,6 @@
           "type": "BOOL"
         },
         {
-          "name": "CMAKE_BUILD_TYPE",
-          "value": "Release",
-          "type": "STRING"
-        },
-        {
           "name": "BUILD_TESTS",
           "value": "False",
           "type": "BOOL"

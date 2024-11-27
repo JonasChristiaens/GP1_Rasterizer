@@ -146,14 +146,20 @@ namespace dae {
 	{
 		//TODO W1
 
+		// we have chosen for the other implementation
+
 		return {};
 	}
 
-	Matrix Matrix::CreatePerspectiveFovLH(float fov, float aspect, float zn, float zf)
+	Matrix Matrix::CreatePerspectiveFovLH(float fovy, float aspect, float zn, float zf)
 	{
 		//TODO W3
-
-		return {};
+		return {
+			{1 / (aspect * fovy),	0,			0,						0},
+			{0,						(1 / fovy),	0,						0},
+			{0,						0,			zf / (zf - zn),			1},
+			{0,						0,			-(zf * zn) / (zf - zn),	0}
+		};
 	}
 
 	Vector3 Matrix::GetAxisX() const

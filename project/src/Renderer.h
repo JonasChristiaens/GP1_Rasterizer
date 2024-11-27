@@ -42,6 +42,9 @@ namespace dae
 		void Renderer_W2_Part2_TriangleStrip();
 		void Renderer_W2_Part2_TriangleList();
 
+		void Renderer_W3();
+		void Renderer_W3_Part1();
+
 		bool IsPointInTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2, const Vector2& pixel);
 		bool SaveBufferToImage() const;
 
