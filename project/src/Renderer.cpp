@@ -794,7 +794,6 @@ void dae::Renderer::Renderer_W3_Part1()
 
 	for (size_t idx = 0; idx < meshes_world.at(0).indices.size() - 2; ++idx)
 	{
-
 		const int idx0 = meshes_world.at(0).indices[idx];
 		const int idx1 = meshes_world.at(0).indices[idx + 1];
 		const int idx2 = meshes_world.at(0).indices[idx + 2];
@@ -829,42 +828,45 @@ void dae::Renderer::Renderer_W3_Part1()
 			for (int py = minY; py <= maxY; ++py)
 			{
 				Vector2 pixel = { static_cast<float>(px) + 0.5f, static_cast<float>(py) + 0.5f };
+				ColorRGB finalColor{};
 
 				if (IsPointInTriangle(p0, p1, p2, pixel))
 				{
-					// interpolate depth 
+					int bufferIdx = px + (py * m_Width);
+
+					// non-linear interpolate depth 
 					float depth = 1 / (
 						weights[0] * (1 / (meshes_world.at(0).vertices_out[idx0].position.z)) +
 						weights[1] * (1 / (meshes_world.at(0).vertices_out[v1Index].position.z)) +
 						weights[2] * (1 / (meshes_world.at(0).vertices_out[v2Index].position.z)));
 
-					// interpolate uv
-					const Vector2 uv
-					{
-						(((meshes_world.at(0).vertices_out[idx0].uv / meshes_world.at(0).vertices_out[idx0].position.z) * weights[0]) +
-						((meshes_world.at(0).vertices_out[v1Index].uv / meshes_world.at(0).vertices_out[v1Index].position.z) * weights[1]) +
-						((meshes_world.at(0).vertices_out[v2Index].uv / meshes_world.at(0).vertices_out[v2Index].position.z) * weights[2])) * depth
+					// Z-test
+					if (depth > m_pDepthBufferPixels[bufferIdx] || depth < 0 && depth > 1) continue;
+					m_pDepthBufferPixels[bufferIdx] = depth;
+
+					// linear interpolated depth
+					float wDepth{ (1 /
+						weights[0] * (1 / (meshes_world.at(0).vertices_out[idx0].position.w)) +
+						weights[1] * (1 / (meshes_world.at(0).vertices_out[v1Index].position.w)) +
+						weights[2] * (1 / (meshes_world.at(0).vertices_out[v2Index].position.w)))
 					};
 
-					int bufferIdx = px + (py * m_Width);
-
-					ColorRGB finalColor{};
-					// Z-test
-					if (depth < m_pDepthBufferPixels[bufferIdx])
+					// interpolate uv and sample texture
+					const Vector2 uv
 					{
-						m_pDepthBufferPixels[bufferIdx] = depth;
+						(((meshes_world.at(0).vertices_out[idx0].uv / meshes_world.at(0).vertices_out[idx0].position.w) * weights[0]) +
+						((meshes_world.at(0).vertices_out[v1Index].uv / meshes_world.at(0).vertices_out[v1Index].position.w) * weights[1]) +
+						((meshes_world.at(0).vertices_out[v2Index].uv / meshes_world.at(0).vertices_out[v2Index].position.w) * weights[2])) * wDepth
+					};
 
-						// interpolate color
-						finalColor = m_pTexture->Sample(uv);
+					finalColor = m_pTexture->Sample(uv);
+					finalColor.MaxToOne();
 
-						// update Color in Buffer
-						finalColor.MaxToOne();
-
-						m_pBackBufferPixels[bufferIdx] = SDL_MapRGB(m_pBackBuffer->format,
-							static_cast<uint8_t>(finalColor.r * 255),
-							static_cast<uint8_t>(finalColor.g * 255),
-							static_cast<uint8_t>(finalColor.b * 255));
-					}
+					// update color in backbuffer
+					m_pBackBufferPixels[bufferIdx] = SDL_MapRGB(m_pBackBuffer->format,
+						static_cast<uint8_t>(finalColor.r * 255),
+						static_cast<uint8_t>(finalColor.g * 255),
+						static_cast<uint8_t>(finalColor.b * 255));
 				}
 			}
 		}
@@ -878,14 +880,18 @@ void Renderer::VertexTransformationFunction(Mesh& mesh) const
 
 	for (int idx{}; idx < mesh.vertices.size(); ++idx)
 	{
+		// transform view space
 		const Vector4 v_viewspace{ m_Camera.worldViewProjectionMatrix.TransformPoint(Vector4{mesh.vertices[idx].position, 1}) };
+
+		// project to NDC
 		Vector4 v_projected{};
 
 		v_projected.x = v_viewspace.x / v_viewspace.w;
 		v_projected.y = v_viewspace.y / v_viewspace.w;
-		v_projected.z = v_viewspace.w;
+		v_projected.z = v_viewspace.z / v_viewspace.w;
 		v_projected.w = v_viewspace.w;
 
+		// convert NDC to screen space
 		v_projected.x = ((v_projected.x + 1) / 2.f) * m_Width;
 		v_projected.y = ((1 - v_projected.y) / 2.f) * m_Height;
 

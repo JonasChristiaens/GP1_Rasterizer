@@ -29,6 +29,8 @@ namespace dae
 
 		float totalPitch{};
 		float totalYaw{};
+		float m_NearPlane{ 0.0f };
+		float m_FarPlane{ 0.0f };
 
 		Matrix worldMatrix{ {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
 		Matrix invViewMatrix{};
@@ -36,17 +38,19 @@ namespace dae
 		Matrix projectionMatrix{};
 		Matrix worldViewProjectionMatrix{};
 
-		void Initialize(float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f})
+		void Initialize(float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f}, float _nearPlane = 1.0f, float _farPlane = 1000.0f)
 		{
 			fovAngle = _fovAngle;
 			fov = tanf((fovAngle * TO_RADIANS) / 2.f);
 
 			origin = _origin;
+			m_NearPlane = _nearPlane;
+			m_FarPlane = _farPlane;
 		}
 
 		void CalculateViewMatrix()
 		{
-			//TODO W1
+			// done in week 1
 			
 			//ONB => invViewMatrix
 			right = Vector3::Cross(Vector3::UnitY, forward).Normalized();
@@ -62,9 +66,9 @@ namespace dae
 
 		void CalculateProjectionMatrix(float aspectRatio)
 		{
-			//TODO W3
+			// done in week 3
 			//DirectX Implementation => https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixperspectivefovlh
-			projectionMatrix = Matrix::CreatePerspectiveFovLH(fov, aspectRatio, 0.0f, 1.0f);
+			projectionMatrix = Matrix::CreatePerspectiveFovLH(fov, aspectRatio, m_NearPlane, m_FarPlane);
 
 			// combine all space transformation matrix into one matrix
 			worldViewProjectionMatrix = worldMatrix * viewMatrix * projectionMatrix;

@@ -1,4 +1,5 @@
 #pragma once
+#pragma once
 #include <cassert>
 #include <fstream>
 #include "Maths.h"
