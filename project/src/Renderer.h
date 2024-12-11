@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "DataTypes.h"
 #include "Camera.h"
 
 struct SDL_Window;
@@ -44,13 +45,28 @@ namespace dae
 
 		void Renderer_W3();
 		void Renderer_W3_Part1();
+		void Renderer_W3_Part2();
 
-		bool IsPointInTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2, const Vector2& pixel);
-		bool SaveBufferToImage() const;
+		void Renderer_W4();
+		void Renderer_W4_Part1();
 
 		void VertexTransformationFunction(Mesh& mesh) const;
+		void CycleLightingMode();
+		void RotateModel();
+		void ShowDepthBuffer();
+
+		bool IsPointInTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2, const Vector2& pixel);
+		static float Remap(float value, float inputMin, float inputMax);
+		ColorRGB PixelShading(Vector3 normal);
+		bool SaveBufferToImage() const;
 
 	private:
+		enum class LightMode
+		{
+			FinalColor,
+			Shading,
+		};
+
 		SDL_Window* m_pWindow{};
 
 		SDL_Surface* m_pFrontBuffer{ nullptr };
@@ -61,11 +77,16 @@ namespace dae
 
 		Texture* m_pTexture;
 		Camera m_Camera{};
+		LightMode m_CurrentLightMode{ LightMode::FinalColor };
 
 		int m_Width{};
 		int m_Height{};
 
 		float weights[3]{};
 		float m_Aspectratio{};
+
+		std::vector<Mesh> meshes_world{};
+
+		bool m_ShowDepthBuffer{ false };
 	};
 }

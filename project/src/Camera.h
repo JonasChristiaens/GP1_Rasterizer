@@ -29,8 +29,8 @@ namespace dae
 
 		float totalPitch{};
 		float totalYaw{};
-		float m_NearPlane{ 0.0f };
-		float m_FarPlane{ 0.0f };
+		float m_NearPlane{ 1.0f };
+		float m_FarPlane{ 1000.0f };
 
 		Matrix worldMatrix{ {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
 		Matrix invViewMatrix{};
@@ -38,7 +38,9 @@ namespace dae
 		Matrix projectionMatrix{};
 		Matrix worldViewProjectionMatrix{};
 
-		void Initialize(float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f}, float _nearPlane = 1.0f, float _farPlane = 1000.0f)
+		bool rotateModel{ false };
+
+		void Initialize(float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f}, float _nearPlane = .1f, float _farPlane = 100.0f)
 		{
 			fovAngle = _fovAngle;
 			fov = tanf((fovAngle * TO_RADIANS) / 2.f);
@@ -124,12 +126,23 @@ namespace dae
 			}
 			Matrix rotationMatrix{ Matrix::CreateRotationX(totalPitch * TO_RADIANS) * Matrix::CreateRotationY(totalYaw * TO_RADIANS) };
 
+			if (rotateModel)
+			{
+				const auto yawAngle{ pTimer->GetTotal() };
+				worldMatrix = Matrix::CreateRotationY(yawAngle);
+			}
+
 			forward = rotationMatrix.TransformVector(Vector3::UnitZ);
 			forward.Normalize();
 
 			//Update Matrices
 			CalculateViewMatrix();
-			CalculateProjectionMatrix(aspectRatio); //Try to optimize this - should only be called once or when fov/aspectRatio changes
+			CalculateProjectionMatrix(aspectRatio); 
+		}
+
+		void RotateModel()
+		{
+			rotateModel = !rotateModel;
 		}
 	};
 }

@@ -8,8 +8,12 @@
 #include "Texture.h"
 #include "Utils.h"
 
+#include <iostream>
+
 using namespace dae;
-std::vector<Mesh> meshes_world
+
+// used for old triangles, without mesh
+/*std::vector<Mesh> meshes_world
 {
 	Mesh
 	{
@@ -32,30 +36,30 @@ std::vector<Mesh> meshes_world
 		PrimitiveTopology::TriangleStrip
 	}
 };
-//std::vector<Mesh> meshes_world
-//{
-//    Mesh
-//    {
-//        {
-//            Vertex{{-3,  3, -2}},
-//            Vertex{{ 0,  3, -2}},
-//            Vertex{{ 3,  3, -2}},
-//            Vertex{{-3,  0, -2}},
-//            Vertex{{ 0,  0, -2}},
-//            Vertex{{ 3,  0, -2}},
-//            Vertex{{-3, -3, -2}},
-//            Vertex{{ 0, -3, -2}},
-//            Vertex{{ 3, -3, -2}},
-//        },
-//        {
-//            3, 0, 1,    1, 4, 3,    4, 1, 2,
-//            2, 5, 4,    6, 3, 4,    4, 7, 6,
-//            7, 4, 5,    5, 8, 7
-//
-//        },
-//        PrimitiveTopology::TriangleList
-//    }
-//};
+std::vector<Mesh> meshes_world
+{
+    Mesh
+    {
+        {
+            Vertex{{-3,  3, -2}},
+            Vertex{{ 0,  3, -2}},
+            Vertex{{ 3,  3, -2}},
+            Vertex{{-3,  0, -2}},
+            Vertex{{ 0,  0, -2}},
+            Vertex{{ 3,  0, -2}},
+            Vertex{{-3, -3, -2}},
+            Vertex{{ 0, -3, -2}},
+            Vertex{{ 3, -3, -2}},
+        },
+        {
+            3, 0, 1,    1, 4, 3,    4, 1, 2,
+            2, 5, 4,    6, 3, 4,    4, 7, 6,
+            7, 4, 5,    5, 8, 7
+
+        },
+        PrimitiveTopology::TriangleList
+    }
+};*/
 
 Renderer::Renderer(SDL_Window* pWindow) :
 	m_pWindow(pWindow)
@@ -73,10 +77,14 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pDepthBufferPixels = new float[m_Width * m_Height];
 
 	// initialize Camera
-	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
+	m_Camera.Initialize(45.f, { .0f, 5.0f,-64.f });
 
 	// load texture
-	m_pTexture = Texture::LoadFromFile("./resources/uv_grid_2.png");
+	m_pTexture = Texture::LoadFromFile("./resources/vehicle_diffuse.png");
+
+	// load tuk tuk
+	meshes_world.push_back(Mesh{ {}, {}, PrimitiveTopology::TriangleList });
+	Utils::ParseOBJ("./resources/vehicle.obj", meshes_world.at(0).vertices, meshes_world.at(0).indices);
 }
 Renderer::~Renderer()
 {
@@ -102,7 +110,8 @@ void Renderer::Render()
 
 	//Renderer_W1();
 	//Renderer_W2();
-	Renderer_W3();
+	//Renderer_W3();
+	Renderer_W4();
 	
 	//@END
 	//Update SDL Surface
@@ -708,75 +717,80 @@ void dae::Renderer::Renderer_W2_Part2_TriangleStrip()
 }
 void dae::Renderer::Renderer_W2_Part2_TriangleList()
 {
+	// not fully working, fixed in Renderer_W3_Part2()
+
 	// transform vertices to screen space
 	VertexTransformationFunction(meshes_world.at(0));
 
-	for (size_t idx = 0; idx < meshes_world.at(0).indices.size() - 2; idx += 3)
+	for (size_t idx = 0; idx < meshes_world.at(0).indices.size(); idx += 3)
 	{
-		const int idx0 = meshes_world.at(0).indices[idx];
-		const int idx1 = meshes_world.at(0).indices[idx + 1];
-		const int idx2 = meshes_world.at(0).indices[idx + 2];
+		const Vector2 v0{ meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx]].position.GetXY() };
+		const Vector2 v1{ meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 1]].position.GetXY() };
+		const Vector2 v2{ meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 2]].position.GetXY() };
 
-		// check for degenerate triangles
-		if (idx0 == idx1 || idx1 == idx2 || idx2 == idx0) continue;
+		int minX{ static_cast<int>(std::ceil(std::min(v0.x, std::min(v1.x, v2.x)))) };
+		int minY{ static_cast<int>(std::ceil(std::min(v0.y, std::min(v1.y, v2.y)))) };
+		int maxX{ static_cast<int>(std::ceil(std::max(v0.x, std::max(v1.x, v2.x)))) };
+		int maxY{ static_cast<int>(std::ceil(std::max(v0.y, std::max(v1.y, v2.y)))) };
 
-		// precompute alternate winding
-		int v1Index = (idx & 1) ? idx2 : idx1;
-		int v2Index = (idx & 1) ? idx1 : idx2;
+		if (minX <= 0.f or minX >= m_Width) continue;
+		if (maxX <= 0.f or maxX >= m_Width) continue;
 
-		// fetch vertices
-		const Vector2 p0 = meshes_world.at(0).vertices_out[idx0].position.GetXY();
-		const Vector2 p1 = meshes_world.at(0).vertices_out[v1Index].position.GetXY();
-		const Vector2 p2 = meshes_world.at(0).vertices_out[v2Index].position.GetXY();
+		if (minY <= 0.f or minY >= m_Width) continue;
+		if (maxY <= 0.f or maxY >= m_Width) continue;
 
-		// compute bounding box
-		int minX = static_cast<int>(std::ceil(std::min(p0.x, std::min(p1.x, p2.x))));
-		int maxX = static_cast<int>(std::ceil(std::max(p0.x, std::max(p1.x, p2.x))));
-		int minY = static_cast<int>(std::ceil(std::min(p0.y, std::min(p1.y, p2.y))));
-		int maxY = static_cast<int>(std::ceil(std::max(p0.y, std::max(p1.y, p2.y))));
+		minX = minX <= 0 ? 0.f : minX;
+		maxX = maxX >= (m_Width - 1) ? (m_Width - 1) : maxX;
 
-		// clamp bounding box to screen
-		minX = std::max(minX, 0);
-		maxX = std::min(maxX, m_Width - 1);
-		minY = std::max(minY, 0);
-		maxY = std::min(maxY, m_Height - 1);
+		minY = minY <= 0 ? 0.f : minY;
+		maxY = maxY >= (m_Height - 1) ? (m_Height - 1) : maxY;
 
-		// tterate over pixels within bounding box
-		for (int px = minX; px <= maxX; ++px)
+		for (int px{ minX }; px < maxX; ++px)
 		{
-			for (int py = minY; py <= maxY; ++py)
+			for (int py{ minY }; py < maxY; ++py)
 			{
-				Vector2 pixel = { static_cast<float>(px) + 0.5f, static_cast<float>(py) + 0.5f };
+				Vector2 pixel_viewSpace{ float(px), float(py) };
 
-				if (IsPointInTriangle(p0, p1, p2, pixel))
+				float totalArea{};
+
+				ColorRGB finalColor{};
+				if (IsPointInTriangle(v0, v1, v2, pixel_viewSpace))
 				{
-					// tnterpolate depth
-					float depth =
-						weights[0] * meshes_world.at(0).vertices_out[idx0].position.z +
-						weights[1] * meshes_world.at(0).vertices_out[v1Index].position.z +
-						weights[2] * meshes_world.at(0).vertices_out[v2Index].position.z;
 
-					int bufferIdx = px + py * m_Width;
+					float zDepth{ 1 / (
+						(weights[0] * (1 / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx]].position.z)) +	
+						(weights[1] * (1 / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 1]].position.z)) + 
+						(weights[2] * (1 / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 2]].position.z))) 
+					};
 
-					// Z-test
-					if (depth < m_pDepthBufferPixels[bufferIdx])
-					{
-						m_pDepthBufferPixels[bufferIdx] = depth;
+					if (m_pDepthBufferPixels[px + (py * m_Width)] < zDepth or zDepth < 0.f or zDepth > 1.f) continue;
+					m_pDepthBufferPixels[px + (py * m_Width)] = zDepth;
 
-						// interpolate color
-						ColorRGB finalColor =
-							weights[0] * meshes_world.at(0).vertices_out[idx0].color +
-							weights[1] * meshes_world.at(0).vertices_out[v1Index].color +
-							weights[2] * meshes_world.at(0).vertices_out[v2Index].color;
+					float wDepth{ 1 / (
+						(weights[0] * (1 / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx]].position.w)) +
+						(weights[1] * (1 / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 1]].position.w)) +
+						(weights[2] * (1 / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 2]].position.w))) 
+					};
 
-						// update Color in Buffer
-						finalColor.MaxToOne();
+					const Vector2 uv{
+						(weights[0] * (meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx]].uv / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx]].position.w) +
+						weights[1] * (meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 1]].uv / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 1]].position.w) +
+						weights[2] * (meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 2]].uv / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 2]].position.w)) * wDepth 
+					};
 
-						m_pBackBufferPixels[bufferIdx] = SDL_MapRGB(m_pBackBuffer->format,
-							static_cast<uint8_t>(finalColor.r * 255),
-							static_cast<uint8_t>(finalColor.g * 255),
-							static_cast<uint8_t>(finalColor.b * 255));
-					}
+					const Vector3 normal{ 
+						(weights[0] * (meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx]].normal / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx]].position.w) +
+						weights[1] * (meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 1]].normal / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 1]].position.w) +
+						weights[2] * (meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 2]].normal / meshes_world.at(0).vertices_out[meshes_world.at(0).indices[idx + 2]].position.w)) * wDepth
+					};
+
+					//Update Color in Buffer
+					finalColor.MaxToOne();
+
+					m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+						static_cast<uint8_t>(finalColor.r * 255),
+						static_cast<uint8_t>(finalColor.g * 255),
+						static_cast<uint8_t>(finalColor.b * 255));
 				}
 			}
 		}
@@ -785,9 +799,10 @@ void dae::Renderer::Renderer_W2_Part2_TriangleList()
 
 void dae::Renderer::Renderer_W3()
 {
-	Renderer_W3_Part1();
+	//Renderer_W3_Part1(); // ProjectionMatrix and DepthBuffer
+	Renderer_W3_Part2(); // Meshes
 }
-void dae::Renderer::Renderer_W3_Part1()
+void dae::Renderer::Renderer_W3_Part1() //working with triangleStrip
 {
 	// transform vertices to screen space
 	VertexTransformationFunction(meshes_world.at(0));
@@ -822,6 +837,10 @@ void dae::Renderer::Renderer_W3_Part1()
 		minY = std::max(minY, 0);
 		maxY = std::min(maxY, m_Height - 1);
 
+		// frustum culling
+		if (minX == 0 || maxX == m_Width - 1) continue;
+		if (minY == 0 || maxY == m_Height - 1) continue;
+
 		// iterate over pixels within bounding box
 		for (int px = minX; px <= maxX; ++px)
 		{
@@ -841,14 +860,14 @@ void dae::Renderer::Renderer_W3_Part1()
 						weights[2] * (1 / (meshes_world.at(0).vertices_out[v2Index].position.z)));
 
 					// Z-test
-					if (depth > m_pDepthBufferPixels[bufferIdx] || depth < 0 && depth > 1) continue;
+					if (depth > m_pDepthBufferPixels[bufferIdx] || depth < 0 || depth > 1) continue;
 					m_pDepthBufferPixels[bufferIdx] = depth;
 
 					// linear interpolated depth
-					float wDepth{ (1 /
+					float wDepth{ (1 / (
 						weights[0] * (1 / (meshes_world.at(0).vertices_out[idx0].position.w)) +
 						weights[1] * (1 / (meshes_world.at(0).vertices_out[v1Index].position.w)) +
-						weights[2] * (1 / (meshes_world.at(0).vertices_out[v2Index].position.w)))
+						weights[2] * (1 / (meshes_world.at(0).vertices_out[v2Index].position.w))))
 					};
 
 					// interpolate uv and sample texture
@@ -859,7 +878,233 @@ void dae::Renderer::Renderer_W3_Part1()
 						((meshes_world.at(0).vertices_out[v2Index].uv / meshes_world.at(0).vertices_out[v2Index].position.w) * weights[2])) * wDepth
 					};
 
-					finalColor = m_pTexture->Sample(uv);
+
+					// toggling between finalColor and Depthbuffer
+					switch (m_CurrentLightMode)
+					{
+					case dae::Renderer::LightMode::FinalColor:
+						finalColor = m_pTexture->Sample(uv);
+						break;
+					case dae::Renderer::LightMode::Shading:
+						// will add later
+						break;
+					default:
+						break;
+					}
+
+					finalColor.MaxToOne();
+
+					// update color in backbuffer
+					m_pBackBufferPixels[bufferIdx] = SDL_MapRGB(m_pBackBuffer->format,
+						static_cast<uint8_t>(finalColor.r * 255),
+						static_cast<uint8_t>(finalColor.g * 255),
+						static_cast<uint8_t>(finalColor.b * 255));
+				}
+			}
+		}
+	}
+}
+void dae::Renderer::Renderer_W3_Part2() // working with triangleList
+{
+	// transform vertices to screen space
+	VertexTransformationFunction(meshes_world.at(0));
+
+	for (size_t idx = 0; idx < meshes_world.at(0).indices.size(); idx += 3)
+	{
+		const int idx0 = meshes_world.at(0).indices[idx];
+		const int idx1 = meshes_world.at(0).indices[idx + 1];
+		const int idx2 = meshes_world.at(0).indices[idx + 2];
+
+		// fetch vertices
+		const Vector2 p0 = meshes_world.at(0).vertices_out[idx0].position.GetXY();
+		const Vector2 p1 = meshes_world.at(0).vertices_out[idx1].position.GetXY();
+		const Vector2 p2 = meshes_world.at(0).vertices_out[idx2].position.GetXY();
+
+		// compute bounding box
+		int minX = static_cast<int>(std::min(p0.x, std::min(p1.x, p2.x)));
+		int maxX = static_cast<int>(std::ceil(std::max(p0.x, std::max(p1.x, p2.x))));
+		int minY = static_cast<int>(std::min(p0.y, std::min(p1.y, p2.y)));
+		int maxY = static_cast<int>(std::ceil(std::max(p0.y, std::max(p1.y, p2.y))));
+
+		// frustum culling
+		if (minX <= 0 || maxX >= m_Width - 1) continue;
+		if (minY <= 0 || maxY >= m_Height - 1) continue;
+
+		// clamp bounding box to screen
+		minX = std::max(minX, 0);
+		maxX = std::min(maxX, m_Width - 1);
+		minY = std::max(minY, 0);
+		maxY = std::min(maxY, m_Height - 1);
+
+		// iterate over pixels within bounding box
+		for (int px = minX; px <= maxX; ++px)
+		{
+			for (int py = minY; py <= maxY; ++py)
+			{
+				Vector2 pixel = { static_cast<float>(px) + 0.5f, static_cast<float>(py) + 0.5f };
+				ColorRGB finalColor{};
+
+				if (IsPointInTriangle(p0, p1, p2, pixel))
+				{
+					// caching vertices and precalculating values
+					const auto& vertices = meshes_world.at(0).vertices_out;
+					const auto& indices = meshes_world.at(0).indices;
+
+					const auto& v0 = vertices[indices[idx]];
+					const auto& v1 = vertices[indices[idx + 1]];
+					const auto& v2 = vertices[indices[idx + 2]];
+
+					const float invZ0 = 1.0f / v0.position.z;
+					const float invZ1 = 1.0f / v1.position.z;
+					const float invZ2 = 1.0f / v2.position.z;
+
+					int bufferIdx = px + (py * m_Width);
+
+					// calculate Z depth
+					float zDepth { 1.0f / ( weights[0] * invZ0 + weights[1] * invZ1 + weights[2] * invZ2 ) };
+
+					// depth test
+					if (m_pDepthBufferPixels[bufferIdx] < zDepth or zDepth < 0.f or zDepth > 1.f) continue;
+					m_pDepthBufferPixels[bufferIdx] = zDepth;
+
+					// precalculate wdepth values
+					const float invW0 = 1.0f / v0.position.w;
+					const float invW1 = 1.0f / v1.position.w;
+					const float invW2 = 1.0f / v2.position.w;
+
+					// calculate W depth uv and normal
+					float wDepth{ 1.0f / ( weights[0] * invW0 + weights[1] * invW1 + weights[2] * invW2 ) };
+					const Vector2 uv{ (weights[0] * (v0.uv * invW0) + weights[1] * (v1.uv * invW1) + weights[2] * (v2.uv * invW2)) * wDepth };
+					const Vector3 normal{ (weights[0] * (v0.normal * invW0) + weights[1] * (v1.normal * invW1) + weights[2] * (v2.normal * invW2)) * wDepth };
+
+					// toggling between finalColor and Depthbuffer
+					switch (m_CurrentLightMode)
+					{
+					case dae::Renderer::LightMode::FinalColor:
+						finalColor = m_pTexture->Sample(uv);
+						break;
+					case dae::Renderer::LightMode::Shading:
+					{
+						const float remappedWbuffer{ Remap(zDepth, 0.985f, 1.0f) };
+						finalColor = ColorRGB(remappedWbuffer, remappedWbuffer, remappedWbuffer);
+					}
+						break;
+					default:
+						break;
+					}
+
+					finalColor.MaxToOne();
+
+					// update color in backbuffer
+					m_pBackBufferPixels[bufferIdx] = SDL_MapRGB(m_pBackBuffer->format,
+						static_cast<uint8_t>(finalColor.r * 255),
+						static_cast<uint8_t>(finalColor.g * 255),
+						static_cast<uint8_t>(finalColor.b * 255));
+				}
+			}
+		}
+	}
+}
+
+void dae::Renderer::Renderer_W4()
+{
+	Renderer_W4_Part1();
+}
+void dae::Renderer::Renderer_W4_Part1()
+{
+	// transform vertices to screen space
+	VertexTransformationFunction(meshes_world.at(0));
+
+	for (size_t idx = 0; idx < meshes_world.at(0).indices.size(); idx += 3)
+	{
+		const int idx0 = meshes_world.at(0).indices[idx];
+		const int idx1 = meshes_world.at(0).indices[idx + 1];
+		const int idx2 = meshes_world.at(0).indices[idx + 2];
+
+		// fetch vertices
+		const Vector2 p0 = meshes_world.at(0).vertices_out[idx0].position.GetXY();
+		const Vector2 p1 = meshes_world.at(0).vertices_out[idx1].position.GetXY();
+		const Vector2 p2 = meshes_world.at(0).vertices_out[idx2].position.GetXY();
+
+		// compute bounding box
+		int minX = static_cast<int>(std::min(p0.x, std::min(p1.x, p2.x)));
+		int maxX = static_cast<int>(std::ceil(std::max(p0.x, std::max(p1.x, p2.x))));
+		int minY = static_cast<int>(std::min(p0.y, std::min(p1.y, p2.y)));
+		int maxY = static_cast<int>(std::ceil(std::max(p0.y, std::max(p1.y, p2.y))));
+
+		// frustum culling
+		if (minX <= 0 || maxX >= m_Width - 1) continue;
+		if (minY <= 0 || maxY >= m_Height - 1) continue;
+
+		// clamp bounding box to screen
+		minX = std::max(minX, 0);
+		maxX = std::min(maxX, m_Width - 1);
+		minY = std::max(minY, 0);
+		maxY = std::min(maxY, m_Height - 1);
+
+		// iterate over pixels within bounding box
+		for (int px = minX; px <= maxX; ++px)
+		{
+			for (int py = minY; py <= maxY; ++py)
+			{
+				Vector2 pixel = { static_cast<float>(px) + 0.5f, static_cast<float>(py) + 0.5f };
+				ColorRGB finalColor{};
+
+				if (IsPointInTriangle(p0, p1, p2, pixel))
+				{
+					// caching vertices and precalculating values
+					const auto& vertices = meshes_world.at(0).vertices_out;
+					const auto& indices = meshes_world.at(0).indices;
+
+					const auto& v0 = vertices[indices[idx]];
+					const auto& v1 = vertices[indices[idx + 1]];
+					const auto& v2 = vertices[indices[idx + 2]];
+
+					const float invZ0 = 1.0f / v0.position.z;
+					const float invZ1 = 1.0f / v1.position.z;
+					const float invZ2 = 1.0f / v2.position.z;
+
+					int bufferIdx = px + (py * m_Width);
+
+					// calculate Z depth
+					float zDepth{ 1.0f / (weights[0] * invZ0 + weights[1] * invZ1 + weights[2] * invZ2) };
+
+					// depth test
+					if (m_pDepthBufferPixels[bufferIdx] < zDepth or zDepth < 0.f or zDepth > 1.f) continue;
+					m_pDepthBufferPixels[bufferIdx] = zDepth;
+
+
+					// precalculate wdepth values
+					const float invW0 = 1.0f / v0.position.w;
+					const float invW1 = 1.0f / v1.position.w;
+					const float invW2 = 1.0f / v2.position.w;
+
+					// calculate W depth uv and normal
+					float wDepth{ 1.0f / (weights[0] * invW0 + weights[1] * invW1 + weights[2] * invW2) };
+					const Vector2 uv{ (weights[0] * (v0.uv * invW0) + weights[1] * (v1.uv * invW1) + weights[2] * (v2.uv * invW2)) * wDepth };
+					const Vector3 normal{ (weights[0] * (v0.normal * invW0) + weights[1] * (v1.normal * invW1) + weights[2] * (v2.normal * invW2)) * wDepth };
+
+					if (m_ShowDepthBuffer)
+					{
+						const float remappedZbuffer{ Remap(zDepth, 0.995f, 1.0f) };
+						finalColor = ColorRGB(remappedZbuffer, remappedZbuffer, remappedZbuffer);
+					}
+					else
+					{
+						// toggling between finalColor and Depthbuffer
+						switch (m_CurrentLightMode)
+						{
+						case dae::Renderer::LightMode::FinalColor:
+							finalColor = m_pTexture->Sample(uv);
+							break;
+						case dae::Renderer::LightMode::Shading:
+							finalColor = PixelShading(normal);
+							break;
+						default:
+							break;
+						}
+					}
+
 					finalColor.MaxToOne();
 
 					// update color in backbuffer
@@ -882,6 +1127,7 @@ void Renderer::VertexTransformationFunction(Mesh& mesh) const
 	{
 		// transform view space
 		const Vector4 v_viewspace{ m_Camera.worldViewProjectionMatrix.TransformPoint(Vector4{mesh.vertices[idx].position, 1}) };
+		const Vector3 normal_viewspace{ m_Camera.worldMatrix.TransformVector(mesh.vertices[idx].normal) };
 
 		// project to NDC
 		Vector4 v_projected{};
@@ -898,6 +1144,20 @@ void Renderer::VertexTransformationFunction(Mesh& mesh) const
 		mesh.vertices_out.emplace_back(v_projected, mesh.vertices[idx].color, mesh.vertices[idx].uv);
 	}
 }
+void dae::Renderer::CycleLightingMode()
+{
+	int lightState{ int(m_CurrentLightMode) };
+	m_CurrentLightMode = LightMode((lightState + 1) % 2);
+}
+void dae::Renderer::RotateModel()
+{
+	m_Camera.RotateModel();
+}
+void dae::Renderer::ShowDepthBuffer()
+{
+	m_ShowDepthBuffer = !m_ShowDepthBuffer;
+}
+
 bool dae::Renderer::IsPointInTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2, const Vector2& pixel)
 {
 	if (pixel == v0 || pixel == v1 || pixel == v2) return true;
@@ -916,6 +1176,27 @@ bool dae::Renderer::IsPointInTriangle(const Vector2& v0, const Vector2& v1, cons
 	weights[2] /= totalArea;
 
 	return true;
+}
+float dae::Renderer::Remap(float value, float inputMin, float inputMax)
+{
+	if (value <= 0.0f) return 0;
+	if (value >= 1.0f) return 1.0f;
+
+	const float diff{ inputMax - inputMin };
+	return (value - inputMin) / diff;
+}
+ColorRGB dae::Renderer::PixelShading(Vector3 normal)
+{
+	Vector3 directionOfLight{ 0.577f, 0.577f, 0.577f };
+	float observedAreaMeasure{ Vector3::Dot(normal, -directionOfLight) };
+	ColorRGB color{};
+
+	if (observedAreaMeasure < 0.f) return color;
+
+	auto lambert = (ColorRGB{ 1.0f, 1.0f, 1.0f } * 1.f) / PI;
+	color = lambert;
+
+	return color;
 }
 bool Renderer::SaveBufferToImage() const
 {
