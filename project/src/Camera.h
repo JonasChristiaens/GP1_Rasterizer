@@ -38,7 +38,7 @@ namespace dae
 		Matrix projectionMatrix{};
 		Matrix worldViewProjectionMatrix{};
 
-		bool rotateModel{ false };
+		bool rotateModel{ true };
 
 		void Initialize(float _fovAngle = 90.f, Vector3 _origin = {0.f,0.f,0.f}, float _nearPlane = 0.1f, float _farPlane = 100.0f)
 		{

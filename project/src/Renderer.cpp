@@ -115,7 +115,7 @@ void Renderer::Render()
 	//Renderer_W1();
 	//Renderer_W2();
 	//Renderer_W3();
-	Renderer_W4();
+	Renderer_W4_Part1(meshes_world.at(0).vertices, meshes_world.at(0).vertices_out, meshes_world.at(0).indices);
 	
 	// create float array
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, std::numeric_limits<float>::max());
@@ -1007,16 +1007,12 @@ void dae::Renderer::Renderer_W3_Part2() // working with triangleList
 }
 */
 
-void dae::Renderer::Renderer_W4()
-{
-	Renderer_W4_Part1();
-}
-void dae::Renderer::Renderer_W4_Part1()
+void dae::Renderer::Renderer_W4_Part1(const std::vector<Vertex>& vertex_in, std::vector<Vertex_Out>& vertex_out, const std::vector<uint32_t>& indices)
 {
 	// transform vertices to screen space
-	VertexTransformationFunction(meshes_world.at(0));
+	VertexTransformationFunction(vertex_in, vertex_out);
 
-	for (size_t idx = 0; idx < meshes_world.at(0).indices.size(); idx += 3)
+	for (size_t idx = 0; idx < indices.size(); idx += 3)
 	{
 		const int idx0 = meshes_world.at(0).indices[idx];
 		const int idx1 = meshes_world.at(0).indices[idx + 1];
@@ -1130,16 +1126,23 @@ void dae::Renderer::Renderer_W4_Part1()
 	}
 }
 
-void Renderer::VertexTransformationFunction(Mesh& mesh) const
+void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertex_in, std::vector<Vertex_Out>& vertex_out) const
 {
-	mesh.vertices_out.clear();
-	mesh.vertices_out.reserve(mesh.vertices.size());
+	vertex_out.clear();
+	vertex_out.reserve(vertex_in.size());
 
-	for (int idx{}; idx < mesh.vertices.size(); ++idx)
+	for (int idx{}; idx < vertex_in.size(); ++idx)
 	{
 		// transform view space
-		const Vector4 v_viewspace{ m_Camera.worldViewProjectionMatrix.TransformPoint(Vector4{mesh.vertices[idx].position, 1}) };
-		const Vector3 normal_viewspace{ m_Camera.worldMatrix.TransformVector(mesh.vertices[idx].normal) };
+		const Vector4 v_viewspace{ m_Camera.worldViewProjectionMatrix.TransformPoint(Vector4{vertex_in[idx].position, 1}) };
+
+		auto normal{ m_Camera.worldMatrix.TransformVector(vertex_in[idx].normal) };
+		normal.Normalize();
+
+		auto tangent{ m_Camera.worldMatrix.TransformVector(vertex_in[idx].tangent) };
+		tangent.Normalize();
+
+		Vector3 viewDirection{ v_viewspace.x, v_viewspace.y, v_viewspace.w };
 
 		// project to NDC
 		Vector4 v_projected{};
@@ -1153,7 +1156,7 @@ void Renderer::VertexTransformationFunction(Mesh& mesh) const
 		v_projected.x = ((v_projected.x + 1) / 2.f) * m_Width;
 		v_projected.y = ((1 - v_projected.y) / 2.f) * m_Height;
 
-		mesh.vertices_out.emplace_back(v_projected, mesh.vertices[idx].color, mesh.vertices[idx].uv);
+		vertex_out.emplace_back(v_projected, vertex_in[idx].color, vertex_in[idx].uv, normal, tangent, viewDirection);
 	}
 }
 void dae::Renderer::CycleLightingMode()

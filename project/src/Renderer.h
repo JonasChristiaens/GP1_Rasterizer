@@ -47,10 +47,9 @@ namespace dae
 		void Renderer_W3_Part1();
 		void Renderer_W3_Part2();*/
 
-		void Renderer_W4();
-		void Renderer_W4_Part1();
+		void Renderer_W4_Part1(const std::vector<Vertex>& vertex_in, std::vector<Vertex_Out>& vertex_out, const std::vector<uint32_t>& indices);
 
-		void VertexTransformationFunction(Mesh& mesh) const;
+		void VertexTransformationFunction(const std::vector<Vertex>& vertex_in, std::vector<Vertex_Out>& vertex_out) const;
 		void CycleLightingMode();
 		void RotateModel();
 		void ShowDepthBuffer();
@@ -87,7 +86,7 @@ namespace dae
 		Texture* m_pGlossTexture;
 
 		Camera m_Camera{};
-		LightMode m_CurrentLightMode{};
+		LightMode m_CurrentLightMode{ LightMode::Combined };
 
 		std::vector<Mesh> meshes_world{};
 
@@ -98,6 +97,6 @@ namespace dae
 		float m_Aspectratio{};
 
 		bool m_ShowDepthBuffer{ false };
-		bool m_ShowNormalMap{ false };
+		bool m_ShowNormalMap{ true };
 	};
 }
