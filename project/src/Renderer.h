@@ -31,7 +31,7 @@ namespace dae
 		void Update(Timer* pTimer);
 		void Render();
 
-		void Renderer_W1();
+		/*void Renderer_W1();
 		void Renderer_W1_Part1();
 		void Renderer_W1_Part2();
 		void Renderer_W1_Part3();
@@ -45,7 +45,7 @@ namespace dae
 
 		void Renderer_W3();
 		void Renderer_W3_Part1();
-		void Renderer_W3_Part2();
+		void Renderer_W3_Part2();*/
 
 		void Renderer_W4();
 		void Renderer_W4_Part1();
@@ -54,17 +54,23 @@ namespace dae
 		void CycleLightingMode();
 		void RotateModel();
 		void ShowDepthBuffer();
+		void ShowNormalMap();
 
-		bool IsPointInTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2, const Vector2& pixel);
+		bool IsPointInTriangle(const Vertex_Out& v0, const Vertex_Out& v1, const Vertex_Out& v2, const Vector2& pixel, Vertex_Out& interpolatedVertex );
 		static float Remap(float value, float inputMin, float inputMax);
-		ColorRGB PixelShading(Vector3 normal);
+		ColorRGB ObvAreaPixelShading(Vector3 normal);
+		ColorRGB DiffusePixelShading(Vector3 normal, ColorRGB diffuseColor);
+		ColorRGB CombinedPixelShading(Vector3 normal, ColorRGB diffuseColor, ColorRGB specularColor, ColorRGB glossColor, Vector3 viewDirection);
+
 		bool SaveBufferToImage() const;
 
 	private:
 		enum class LightMode
 		{
-			FinalColor,
-			Shading,
+			ObservedArea,
+			Diffuse, 
+			Specular,
+			Combined
 		};
 
 		SDL_Window* m_pWindow{};
@@ -75,9 +81,15 @@ namespace dae
 
 		float* m_pDepthBufferPixels{};
 
-		Texture* m_pTexture;
+		Texture* m_pDiffuseTexture;
+		Texture* m_pNormalTexture;
+		Texture* m_pSpecularTexture;
+		Texture* m_pGlossTexture;
+
 		Camera m_Camera{};
-		LightMode m_CurrentLightMode{ LightMode::FinalColor };
+		LightMode m_CurrentLightMode{};
+
+		std::vector<Mesh> meshes_world{};
 
 		int m_Width{};
 		int m_Height{};
@@ -85,8 +97,7 @@ namespace dae
 		float weights[3]{};
 		float m_Aspectratio{};
 
-		std::vector<Mesh> meshes_world{};
-
 		bool m_ShowDepthBuffer{ false };
+		bool m_ShowNormalMap{ false };
 	};
 }
