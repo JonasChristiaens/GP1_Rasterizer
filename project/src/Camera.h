@@ -31,6 +31,7 @@ namespace dae
 		float totalYaw{};
 		float m_NearPlane{ 1.0f };
 		float m_FarPlane{ 1000.0f };
+		float rotation{};
 
 		Matrix worldMatrix{ {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
 		Matrix invViewMatrix{};
@@ -128,8 +129,8 @@ namespace dae
 
 			if (rotateModel)
 			{
-				const auto yawAngle{ pTimer->GetTotal() };
-				worldMatrix = Matrix::CreateRotationY(yawAngle);
+				rotation += pTimer->GetElapsed();
+				worldMatrix = Matrix::CreateRotationY(rotation);
 			}
 
 			forward = rotationMatrix.TransformVector(Vector3::UnitZ);
